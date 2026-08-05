@@ -11,5 +11,3 @@ Encoding: UTF-8
 
 RnwWeave: Sweave
 LaTeX: pdfLaTeX
-
-ProjectName: SimpleRT Study 1 data analysis
