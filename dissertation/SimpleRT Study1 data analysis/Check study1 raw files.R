@@ -15,7 +15,7 @@
 library(tidyverse)
 
 # ---- 0. Point this at your raw data folder -----------------------------------
-raw_dir <- "data/study1_raw"   # <-- update to your actual path
+raw_dir <- "/Users/stephens/R/dissertation/data/study1_raw"   # <-- update to your actual path
 expected_n_files <- 50          # 52 originally enrolled, minus 2 excluded for equipment failure
 
 # Subject IDs excluded for equipment failure — fill these in with the actual IDs.
