@@ -27,7 +27,13 @@ if (length(file_list) != expected_n_files) {
 }
 
 read_one <- function(path) {
-  read_tsv(path, skip = 1, show_col_types = FALSE) %>%
+  read_tsv(
+    path,
+    skip = 1,
+    quote = "",
+    locale = locale(encoding = "UTF-16LE"),
+    show_col_types = FALSE
+  ) %>%
     mutate(source_file = basename(path))
 }
 
