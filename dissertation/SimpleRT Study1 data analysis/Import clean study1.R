@@ -10,7 +10,7 @@
 library(tidyverse)
 
 # ---- 0. Point this at your raw data folder ------------------------------------
-raw_dir <- "/Users/stephens/R/dissertation/data/study1_raw"   # <-- update to your actual path
+raw_dir <- "data/study1_raw"   # <-- update to your actual path
 expected_n_files <- 50          # 52 enrolled, minus 2 excluded for equipment failure
 
 
@@ -27,6 +27,12 @@ if (length(file_list) != expected_n_files) {
 }
 
 read_one <- function(path) {
+  # quote = "" disables quote-character interpretation, since embedded XML in
+  # Clock.Information (e.g. dt:dt="string") would otherwise confuse read_tsv's
+  # quoting logic and misalign column counts for nearly every row.
+  # locale(encoding = "UTF-16LE") is required because these E-Prime exports are
+  # UTF-16LE encoded, not UTF-8 — confirmed via readr::guess_encoding() and a
+  # zero-problems result from problems() after applying this fix.
   read_tsv(
     path,
     skip = 1,
