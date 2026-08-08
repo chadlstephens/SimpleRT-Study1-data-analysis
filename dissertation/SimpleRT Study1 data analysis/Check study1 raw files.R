@@ -22,7 +22,7 @@ expected_n_files <- 50          # 52 originally enrolled, minus 2 excluded for e
 # This lets Check 2 confirm the RIGHT two subjects are missing, not just that
 # the count happens to be 50 (which could mask a different subject being
 # dropped by mistake, e.g. a duplicate file overwrite or a misplaced file).
-excluded_subject_ids <- c()   # <-- e.g. c("14", "29")
+excluded_subject_ids <- c("32", "39")   # <-- e.g. c("14", "29")
 
 file_list <- list.files(raw_dir, pattern = "\\.txt$", full.names = TRUE)
 
