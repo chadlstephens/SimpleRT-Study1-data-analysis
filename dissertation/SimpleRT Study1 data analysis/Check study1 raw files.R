@@ -6,19 +6,23 @@
 #          until the flagged file(s) are resolved.
 #          NOTE: Original design N was 52; 2 subjects were excluded due to
 #          equipment failure, so 50 files/subjects is the expected count here.
+#          NOTE: These E-Prime exports are UTF-16LE encoded (confirmed via
+#          guess_encoding() + a zero-problems result from problems()) — all
+#          read_tsv() calls below specify locale(encoding = "UTF-16LE") and
+#          quote = "" to read them correctly.
 # ==============================================================================
 
 library(tidyverse)
 
 # ---- 0. Point this at your raw data folder -----------------------------------
-raw_dir <- "/Users/stephens/R/dissertation/data/study1_raw"   # <-- update to your actual path
+raw_dir <- "data/study1_raw"   # <-- update to your actual path
 expected_n_files <- 50          # 52 originally enrolled, minus 2 excluded for equipment failure
 
 # Subject IDs excluded for equipment failure — fill these in with the actual IDs.
 # This lets Check 2 confirm the RIGHT two subjects are missing, not just that
 # the count happens to be 50 (which could mask a different subject being
 # dropped by mistake, e.g. a duplicate file overwrite or a misplaced file).
-excluded_subject_ids <- c("32", "39")   # <-- e.g. c("14", "29")
+excluded_subject_ids <- c()   # <-- e.g. c("14", "29")
 
 file_list <- list.files(raw_dir, pattern = "\\.txt$", full.names = TRUE)
 
@@ -34,7 +38,16 @@ if (length(file_list) != expected_n_files) {
 
 get_header <- function(path) {
   # n_max = 0 reads only the header row (fast; avoids parsing all data)
-  names(suppressWarnings(read_tsv(path, skip = 1, n_max = 0, show_col_types = FALSE)))
+  # quote = "" disables quote-character interpretation, since embedded XML in
+  # Clock.Information (e.g. dt:dt="string") would otherwise confuse the parser.
+  # locale(encoding = "UTF-16LE") is required — these E-Prime exports are
+  # UTF-16LE encoded, not UTF-8 (confirmed via guess_encoding() + zero-problems
+  # result from problems()).
+  names(suppressWarnings(read_tsv(
+    path, skip = 1, n_max = 0, quote = "",
+    locale = locale(encoding = "UTF-16LE"),
+    show_col_types = FALSE
+  )))
 }
 
 headers <- map(file_list, get_header)
@@ -89,7 +102,11 @@ if (all(header_check$same_order)) {
 # ==============================================================================
 
 get_subject_and_nrow <- function(path) {
-  df <- suppressWarnings(read_tsv(path, skip = 1, show_col_types = FALSE))
+  df <- suppressWarnings(read_tsv(
+    path, skip = 1, quote = "",
+    locale = locale(encoding = "UTF-16LE"),
+    show_col_types = FALSE
+  ))
   tibble(
     file        = basename(path),
     n_rows      = nrow(df),
