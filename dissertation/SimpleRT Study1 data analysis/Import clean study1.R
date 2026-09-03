@@ -10,8 +10,14 @@
 library(tidyverse)
 
 # ---- 0. Point this at your raw data folder ------------------------------------
-raw_dir <- "/Users/stephens/R/dissertation/data/study1_raw"   # <-- update to your actual path
+raw_dir <- "data/study1_raw"   # <-- update to your actual path
 expected_n_files <- 50          # 52 enrolled, minus 2 excluded for equipment failure
+
+# Sample accounting per Yang et al. (2017): 52 enrolled -> 2 excluded (equipment
+# failure) -> 1 withdrew -> 49 analyzed. The 2 equipment-failure exclusions were
+# already applied before you received these 50 files. The withdrawn subject's
+# file IS still present among the 50 -- exclude it here once the ID is confirmed.
+withdrawn_subject_id <- NA_character_   # <-- fill in once Dr. Yang confirms, e.g. "17"
 
 
 # ==============================================================================
@@ -53,6 +59,23 @@ cat("Unique source files: ", n_distinct(raw_all$source_file), "\n")
 if (n_distinct(raw_all$Subject) != expected_n_files) {
   warning("Unique Subject count (", n_distinct(raw_all$Subject),
           ") does not match expected_n_files (", expected_n_files, ").")
+}
+
+# ---- Apply the withdrawn-subject exclusion, if known ----
+if (is.na(withdrawn_subject_id)) {
+  cat("\nNOTE: 'withdrawn_subject_id' is not yet set. All", n_distinct(raw_all$Subject),
+      "subjects will be carried through cleaning for now. Do NOT treat any results",
+      "as final until this is set and the pipeline is re-run -- the analyzed N",
+      "should be 49 per Yang et al. (2017), not", n_distinct(raw_all$Subject), ".\n")
+} else {
+  if (!withdrawn_subject_id %in% as.character(raw_all$Subject)) {
+    warning("withdrawn_subject_id ('", withdrawn_subject_id,
+            "') was not found among the imported Subject IDs -- double-check it before proceeding.")
+  }
+  n_before <- n_distinct(raw_all$Subject)
+  raw_all <- raw_all %>% filter(as.character(Subject) != withdrawn_subject_id)
+  cat("\nApplied withdrawal exclusion: removed Subject", withdrawn_subject_id,
+      "->", n_before, "subjects reduced to", n_distinct(raw_all$Subject), "\n")
 }
 
 
@@ -191,11 +214,39 @@ if (nrow(incomplete_subjects) == 0) {
   print(incomplete_subjects)
 }
 
+cat("\n-- 5f. Sample size accounting vs. Yang et al. (2017) --\n")
+n_enrolled   <- 52
+n_equipment  <- 2
+n_withdrawal <- if (is.na(withdrawn_subject_id)) NA_integer_ else 1
+n_current    <- n_distinct(analysis_df$Subject)
+n_expected_final <- 49
+
+cat("Enrolled:                     ", n_enrolled, "\n")
+cat("Excluded (equipment failure): ", n_equipment, " (subjects 32, 39)\n", sep = "")
+cat("Excluded (withdrawal):        ",
+    if (is.na(withdrawn_subject_id)) "PENDING -- not yet applied" else paste0("1 (subject ", withdrawn_subject_id, ")"),
+    "\n", sep = "")
+cat("Subjects in analysis_df now:  ", n_current, "\n")
+cat("Expected final N (Yang et al., 2017): ", n_expected_final, "\n")
+
+if (is.na(withdrawn_subject_id)) {
+  cat("STATUS: Withdrawal not yet applied -- current N (", n_current,
+      ") will NOT match the expected final N (", n_expected_final,
+      ") until withdrawn_subject_id is set. Treat all current results as provisional.\n", sep = "")
+} else if (n_current == n_expected_final) {
+  cat("PASS: Current N matches Yang et al. (2017)'s reported final sample of 49.\n")
+} else {
+  cat("FLAG: Current N (", n_current, ") does NOT match the expected 49 even after applying",
+      " the withdrawal exclusion -- investigate before proceeding.\n", sep = "")
+}
+
 cat("\n================ END DIAGNOSTIC REPORT ================\n")
 cat("\nReview all sections above. Do not proceed to model fitting until:\n",
     "  - 5a shows no unresolved low-N cells (or you've made a documented decision on them)\n",
     "  - 5c aggressive-trimming cells have been checked for data-quality issues\n",
     "  - 5e shows no subjects missing a full cardiac-phase cell\n",
-    "  - You have confirmed the systole/diastole coding for CardiacPhase_raw (see clean_study1())\n", sep = "")
+    "  - You have confirmed the systole/diastole coding for CardiacPhase_raw (see clean_study1())\n",
+    "  - withdrawn_subject_id is set and the pipeline re-run, so the final N matches\n",
+    "    Yang et al. (2017)'s reported 49\n", sep = "")
 
 # analysis_df is now ready for the Model 1.1 lmer() step, once the above are resolved.
