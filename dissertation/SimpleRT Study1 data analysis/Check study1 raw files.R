@@ -15,14 +15,14 @@
 library(tidyverse)
 
 # ---- 0. Point this at your raw data folder -----------------------------------
-raw_dir <- "/Users/stephens/R/dissertation/data/study1_raw"   # <-- update to your actual path
+raw_dir <- "data/study1_raw"   # <-- update to your actual path
 expected_n_files <- 50          # 52 originally enrolled, minus 2 excluded for equipment failure
 
 # Subject IDs excluded for equipment failure — fill these in with the actual IDs.
 # This lets Check 2 confirm the RIGHT two subjects are missing, not just that
 # the count happens to be 50 (which could mask a different subject being
 # dropped by mistake, e.g. a duplicate file overwrite or a misplaced file).
-excluded_subject_ids <- c("32", "39")   # <-- e.g. c("14", "29")
+excluded_subject_ids <- c("32", "39")   # confirmed: equipment failure exclusions
 
 file_list <- list.files(raw_dir, pattern = "\\.txt$", full.names = TRUE)
 
