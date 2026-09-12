@@ -1,11 +1,13 @@
 # ==============================================================================
 # Study 1 Raw Data Validation Script
-# Purpose: Confirm structural consistency across all 50 raw .txt files BEFORE
+# Purpose: Confirm structural consistency across all 49 raw .txt files BEFORE
 #          stacking them with bind_rows()/map_dfr(). Run this first — if either
 #          check below fails, do not proceed to the import/cleaning pipeline
 #          until the flagged file(s) are resolved.
-#          NOTE: Original design N was 52; 2 subjects were excluded due to
-#          equipment failure, so 50 files/subjects is the expected count here.
+#          NOTE: Original design N was 52; 3 subjects (32, 45, 48) were excluded
+#          per Dr. Yang's confirmation, so 49 files/subjects is the expected
+#          count here. Subject 39 is NOT excluded -- it was simply missing from
+#          the original .txt export folder and must be added back in.
 #          NOTE: These E-Prime exports are UTF-16LE encoded (confirmed via
 #          guess_encoding() + a zero-problems result from problems()) — all
 #          read_tsv() calls below specify locale(encoding = "UTF-16LE") and
@@ -15,14 +17,20 @@
 library(tidyverse)
 
 # ---- 0. Point this at your raw data folder -----------------------------------
-raw_dir <- "/Users/stephens/R/dissertation/data/study1_raw"   # <-- update to your actual path
-expected_n_files <- 50          # 52 originally enrolled, minus 2 excluded for equipment failure
+raw_dir <- "data/study1_raw"   # <-- update to your actual path
+expected_n_files <- 49          # 52 enrolled, minus 3 excluded (32, 45, 48) per Dr. Yang's
+# confirmation. NOTE: your raw_dir needs ace045.txt and
+# ace048.txt REMOVED and ace039.txt ADDED (subject 39 was
+# mistakenly missing from the .txt export folder, but IS
+# part of the analyzed sample).
 
-# Subject IDs excluded for equipment failure — fill these in with the actual IDs.
-# This lets Check 2 confirm the RIGHT two subjects are missing, not just that
-# the count happens to be 50 (which could mask a different subject being
+# Subject IDs excluded per Dr. Yang's confirmation.
+# This lets Check 2 confirm the RIGHT three subjects are missing, not just that
+# the count happens to be 49 (which could mask a different subject being
 # dropped by mistake, e.g. a duplicate file overwrite or a misplaced file).
-excluded_subject_ids <- c("32", "39")   # confirmed: equipment failure exclusions
+excluded_subject_ids <- c("32", "45", "48")   # confirmed by Dr. Yang:
+#   32, 45 = excluded due to equipment/device failure
+#   48     = withdrew from the experiment
 
 file_list <- list.files(raw_dir, pattern = "\\.txt$", full.names = TRUE)
 
@@ -33,7 +41,7 @@ if (length(file_list) != expected_n_files) {
 }
 
 # ==============================================================================
-# CHECK 1: Do all 52 files have identical column names, in identical order?
+# CHECK 1: Do all 49 files have identical column names, in identical order?
 # ==============================================================================
 
 get_header <- function(path) {
@@ -98,7 +106,7 @@ if (all(header_check$same_order)) {
 }
 
 # ==============================================================================
-# CHECK 2: 52 unique Subject values, and 530 rows per file
+# CHECK 2: 49 unique Subject values, and 530 rows per file
 # ==============================================================================
 
 get_subject_and_nrow <- function(path) {
@@ -146,8 +154,8 @@ cat("\nTotal files:", nrow(structure_check),
     "| Unique Subject IDs across files:", n_unique_subjects, "\n")
 
 if (n_unique_subjects != expected_n_files) {
-  cat("NOTE: Expected", expected_n_files, "unique subjects (52 enrolled minus 2 excluded",
-      "for equipment failure) but found", n_unique_subjects, "- confirm this matches your",
+  cat("NOTE: Expected", expected_n_files, "unique subjects (52 enrolled minus 3 excluded:",
+      "32, 45, 48) but found", n_unique_subjects, "- confirm this matches your",
       "current exclusion records.\n")
 }
 
@@ -164,12 +172,12 @@ if (n_unique_subjects == nrow(structure_check)) {
           select(file, subject_id))
 }
 
-# 2d. Confirm the SPECIFIC subjects excluded for equipment failure are the
-#     ones actually missing — guards against the count being 50 for the
-#     wrong reason (e.g. a different subject's file was accidentally omitted
-#     or duplicated, while one of the intended-exclusion IDs slipped through).
+# 2d. Confirm the SPECIFIC subjects excluded (32, 45, 48) are the ones actually
+#     missing — guards against the count being 49 for the wrong reason (e.g. a
+#     different subject's file was accidentally omitted or duplicated, while
+#     one of the intended-exclusion IDs slipped through).
 if (length(excluded_subject_ids) == 0) {
-  cat("\nNOTE: 'excluded_subject_ids' is empty — fill in the two equipment-failure",
+  cat("\nNOTE: 'excluded_subject_ids' is empty — fill in the three confirmed exclusion",
       "Subject IDs at the top of this script to enable this check.\n")
 } else {
   present_ids <- unique(structure_check$subject_id)
@@ -177,16 +185,16 @@ if (length(excluded_subject_ids) == 0) {
   wrongly_present <- intersect(excluded_subject_ids, present_ids)
   if (length(wrongly_present) > 0) {
     cat("\nFAIL: The following excluded Subject ID(s) were found in the raw data folder",
-        "(they should have been removed for equipment failure):\n")
+        "(they should have been removed):\n")
     print(wrongly_present)
   } else {
     cat("\nPASS: None of the excluded Subject ID(s) (", paste(excluded_subject_ids, collapse = ", "),
         ") are present among the retained files.\n")
   }
   
-  # Also confirm every OTHER expected subject (i.e. not one of the two exclusions)
+  # Also confirm every OTHER expected subject (i.e. not one of the three exclusions)
   # is present, in case a non-excluded subject's file went missing instead.
-  # This assumes subject IDs are sequential 1:52 with the two exclusions removed;
+  # This assumes subject IDs are sequential 1:52 with the three exclusions removed;
   # adjust 'all_expected_ids' if your original numbering scheme differs.
   all_expected_ids <- setdiff(as.character(1:52), excluded_subject_ids)
   unexpectedly_missing <- setdiff(all_expected_ids, present_ids)
@@ -195,7 +203,7 @@ if (length(excluded_subject_ids) == 0) {
         "but are MISSING from the raw data folder:\n")
     print(unexpectedly_missing)
   } else if (length(excluded_subject_ids) > 0) {
-    cat("PASS: All non-excluded expected Subject IDs (1-52 minus the 2 exclusions) are present.\n")
+    cat("PASS: All non-excluded expected Subject IDs (1-52 minus the 3 exclusions) are present.\n")
   }
 }
 
