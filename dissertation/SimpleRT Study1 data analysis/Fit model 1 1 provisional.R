@@ -1,19 +1,17 @@
 # ==============================================================================
-# Study 1: Model 1.1 - Cardiac Phase Effect on RT (PROVISIONAL, N=50)
-# Purpose: Fit the primary mixed-effects model from Section 2.4.3.1.1 on the
-#          current N=50 sample, as a provisional check while awaiting two
-#          confirmations from Dr. Yang:
-#            1. Which CardiacTim value (1 or 2) is systole vs. diastole
-#            2. Which subject ID withdrew (final N should be 49, not 50)
+# Study 1: Model 1.1 - Cardiac Phase Effect on RT
+# Purpose: Fit the primary mixed-effects model from Section 2.4.3.1.1.
+#
+# CardiacTim coding CONFIRMED by Dr. Yang (email): 1 = systole, 2 = diastole.
+# CardiacPhase is effect-coded systole = -0.5, diastole = +0.5, so a NEGATIVE
+# beta1 means RT is faster (lower) in diastole than systole, and a POSITIVE
+# beta1 means RT is faster in systole than diastole. Direction is now safe to
+# interpret and report.
 #
 # Run import_clean_study1.R FIRST -- this script assumes `analysis_df` already
 # exists in your environment with columns: Subject, RT_clean, CardiacPhase,
-# CardiacPhase_raw.
-#
-# *** DO NOT report or interpret the DIRECTION of the beta1 coefficient from
-# *** this run. The sign depends entirely on the still-unconfirmed systole/
-# *** diastole mapping. Magnitude, significance, and model fit statistics are
-# *** unaffected and safe to inspect now.
+# CardiacPhase_raw, and reflects the corrected N=49 sample (subjects 32, 45,
+# 48 excluded; 39 included) once you've updated raw_dir accordingly.
 # ==============================================================================
 
 library(tidyverse)
@@ -28,12 +26,13 @@ if (!exists("analysis_df")) {
 
 cat("Fitting Model 1.1 on N =", n_distinct(analysis_df$Subject), "subjects.\n")
 if (n_distinct(analysis_df$Subject) != 49) {
-  cat("NOTE: This is a PROVISIONAL fit. Expected final N is 49 (Yang et al., 2017);",
-      "current N is", n_distinct(analysis_df$Subject),
-      "because the withdrawn-subject exclusion has not yet been applied.\n")
+  cat("NOTE: Expected final N is 49 (Yang et al., 2017; subjects 32, 45, 48 excluded, 39 included).",
+      "Current N is", n_distinct(analysis_df$Subject),
+      "-- check that raw_dir has ace045.txt/ace048.txt removed and ace039.txt added,",
+      "then re-run import_clean_study1.R before treating results as final.\n\n")
+} else {
+  cat("N = 49 confirmed -- matches Yang et al. (2017)'s reported final sample.\n\n")
 }
-cat("NOTE: CardiacPhase direction (systole = -0.5 / diastole = +0.5) is UNCONFIRMED.",
-    "Do not interpret the sign of beta1 until Dr. Yang confirms the CardiacTim coding.\n\n")
 
 
 # ==============================================================================
@@ -70,7 +69,7 @@ cat("\nSelected model:", if (use_slope_model) "random slope (m_slope)" else "ran
 # Step 2: Report the primary model output
 # ==============================================================================
 
-cat("\n================ MODEL 1.1 OUTPUT (PROVISIONAL) ================\n")
+cat("\n================ MODEL 1.1 OUTPUT ================\n")
 summary(final_model)
 
 # ---- Fixed effect: CardiacPhase (beta1) ----
@@ -88,8 +87,12 @@ cat("Estimate:  ", round(beta1, 2), "ms\n")
 cat("SE:        ", round(se1, 2), "\n")
 cat("95% CI:    [", round(ci[1], 2), ",", round(ci[2], 2), "]\n")
 cat("t(", round(df1, 1), ") = ", round(t1, 2), ", p = ", format.pval(p1, digits = 3), "\n", sep = "")
-cat("\n*** Magnitude/significance above are interpretable now. DO NOT state which\n",
-    "    phase (systole/diastole) is faster until CardiacTim coding is confirmed. ***\n", sep = "")
+
+# Direction is now interpretable: CardiacPhase is coded systole = -0.5, diastole = +0.5
+faster_phase <- if (beta1 < 0) "diastole" else if (beta1 > 0) "systole" else "neither (beta1 = 0)"
+cat("\nDirection: beta1", if (beta1 < 0) "< 0" else "> 0",
+    "-> RT is numerically faster in", faster_phase, "\n")
+cat("(Significance per the p-value above determines whether this difference is reliable.)\n")
 
 # ---- Effect size (approx. Cohen's d from the effect-coded predictor) ----
 # Since CardiacPhase spans 1 unit (-0.5 to +0.5), beta1 IS the raw mean difference.
@@ -109,11 +112,17 @@ cat("Conditional R2 (fixed + random):    ", round(r2_vals[1, "R2c"], 4), "\n")
 
 
 # ==============================================================================
-# Step 3: Save model objects for later comparison against the N=49 fit
+# Step 3: Save the model object, tagged with the actual N it was fit on
 # ==============================================================================
-saveRDS(list(model = final_model, N = n_distinct(analysis_df$Subject), lrt = lrt_result),
-        "model_1_1_provisional_N50.rds")
+n_tag <- n_distinct(analysis_df$Subject)
+out_file <- paste0("model_1_1_N", n_tag, ".rds")
+saveRDS(list(model = final_model, N = n_tag, lrt = lrt_result), out_file)
 
 cat("\n================ END MODEL 1.1 OUTPUT ================\n")
-cat("\nSaved to model_1_1_provisional_N50.rds for later comparison against the N=49 fit,\n",
-    "once withdrawn_subject_id is confirmed and applied in import_clean_study1.R.\n", sep = "")
+cat("\nSaved to", out_file, "\n")
+if (n_tag != 49) {
+  cat("Re-run this script once raw_dir reflects the corrected N=49 sample",
+      "(subjects 32/45/48 excluded, 39 included) to get the file result you'll report.\n")
+} else {
+  cat("N = 49 confirmed. This is the sample you'll report.\n")
+}
