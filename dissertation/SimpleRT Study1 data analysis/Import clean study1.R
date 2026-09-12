@@ -1,6 +1,6 @@
 # ==============================================================================
 # Study 1: Import, Clean, and Diagnose
-# Purpose: Stack all 50 raw .txt files, apply the no-face-trial cleaning +
+# Purpose: Stack all 49 raw .txt files, apply the no-face-trial cleaning +
 #          Ratcliff (1993) per-subject-per-phase outlier trimming, and inspect
 #          diagnostics BEFORE trusting the resulting analysis dataset.
 #
@@ -10,18 +10,20 @@
 library(tidyverse)
 
 # ---- 0. Point this at your raw data folder ------------------------------------
-raw_dir <- "/Users/stephens/R/dissertation/data/study1_raw"   # <-- update to your actual path
-expected_n_files <- 50          # 52 enrolled, minus 2 excluded for equipment failure
+raw_dir <- "data/study1_raw"   # <-- update to your actual path
+expected_n_files <- 49          # 52 enrolled, minus 3 excluded (32, 45, 48) per Dr. Yang's
+# confirmation. raw_dir must have ace045.txt/ace048.txt
+# REMOVED and ace039.txt ADDED (39 is NOT excluded -- it
+# was just missing from the original .txt export folder).
 
-# Sample accounting per Yang et al. (2017): 52 enrolled -> 2 excluded (equipment
-# failure) -> 1 withdrew -> 49 analyzed. The 2 equipment-failure exclusions were
-# already applied before you received these 50 files. The withdrawn subject's
-# file IS still present among the 50 -- exclude it here once the ID is confirmed.
-withdrawn_subject_id <- NA_character_   # <-- fill in once Dr. Yang confirms, e.g. "17"
+# Confirmed exclusions per Dr. Yang (Yang et al., 2017):
+#   32, 45 = excluded due to equipment/device failure
+#   48     = withdrew from the experiment
+excluded_subject_ids <- c("32", "45", "48")
 
 
 # ==============================================================================
-# STEP 3: Import step — stack all 50 files
+# STEP 3: Import step — stack all 49 files
 # ==============================================================================
 
 file_list <- list.files(raw_dir, pattern = "\\.txt$", full.names = TRUE)
@@ -61,22 +63,22 @@ if (n_distinct(raw_all$Subject) != expected_n_files) {
           ") does not match expected_n_files (", expected_n_files, ").")
 }
 
-# ---- Apply the withdrawn-subject exclusion, if known ----
-if (is.na(withdrawn_subject_id)) {
-  cat("\nNOTE: 'withdrawn_subject_id' is not yet set. All", n_distinct(raw_all$Subject),
-      "subjects will be carried through cleaning for now. Do NOT treat any results",
-      "as final until this is set and the pipeline is re-run -- the analyzed N",
-      "should be 49 per Yang et al. (2017), not", n_distinct(raw_all$Subject), ".\n")
-} else {
-  if (!withdrawn_subject_id %in% as.character(raw_all$Subject)) {
-    warning("withdrawn_subject_id ('", withdrawn_subject_id,
-            "') was not found among the imported Subject IDs -- double-check it before proceeding.")
-  }
+# ---- Safety-net check: confirm none of the 3 confirmed exclusions slipped in ----
+# (raw_dir SHOULD already have these removed -- this just catches it explicitly
+# rather than silently including them if the folder wasn't corrected.)
+present_excluded <- intersect(excluded_subject_ids, as.character(raw_all$Subject))
+if (length(present_excluded) > 0) {
   n_before <- n_distinct(raw_all$Subject)
-  raw_all <- raw_all %>% filter(as.character(Subject) != withdrawn_subject_id)
-  cat("\nApplied withdrawal exclusion: removed Subject", withdrawn_subject_id,
-      "->", n_before, "subjects reduced to", n_distinct(raw_all$Subject), "\n")
+  raw_all <- raw_all %>% filter(!as.character(Subject) %in% excluded_subject_ids)
+  warning("Subject(s) ", paste(present_excluded, collapse = ", "),
+          " were found in raw_dir despite being confirmed exclusions -- removed here, but you",
+          " should also remove their .txt files from raw_dir directly. (", n_before,
+          " -> ", n_distinct(raw_all$Subject), " subjects)")
+} else {
+  cat("\nConfirmed: none of the excluded subjects (", paste(excluded_subject_ids, collapse = ", "),
+      ") are present in the imported data.\n", sep = "")
 }
+
 
 
 # ==============================================================================
@@ -93,10 +95,10 @@ clean_study1 <- function(df) {
       RT_clean  = coalesce(!!!select(., matches("^Proc\\d{2}End\\.RT$"))),
       ACC_clean = coalesce(!!!select(., matches("^Proc\\d{2}End\\.ACC$"))),
       Miss = ACC_clean == 1 | RT_clean == 0,
-      CardiacPhase_raw = CardiacTim,        # VERIFY 1/2 = systole/diastole before proceeding
+      CardiacPhase_raw = CardiacTim,        # CONFIRMED by Dr. Yang (email): 1 = systole, 2 = diastole
       CardiacPhase = case_when(
-        CardiacPhase_raw == 1 ~ -0.5,       # tentative: systole
-        CardiacPhase_raw == 2 ~  0.5,       # tentative: diastole
+        CardiacPhase_raw == 1 ~ -0.5,       # systole (confirmed)
+        CardiacPhase_raw == 2 ~  0.5,       # diastole (confirmed)
         TRUE ~ NA_real_
       )
     ) %>%
@@ -215,29 +217,22 @@ if (nrow(incomplete_subjects) == 0) {
 }
 
 cat("\n-- 5f. Sample size accounting vs. Yang et al. (2017) --\n")
-n_enrolled   <- 52
-n_equipment  <- 2
-n_withdrawal <- if (is.na(withdrawn_subject_id)) NA_integer_ else 1
-n_current    <- n_distinct(analysis_df$Subject)
+n_enrolled       <- 52
+n_excluded       <- length(excluded_subject_ids)   # 3: subjects 32, 45, 48
+n_current        <- n_distinct(analysis_df$Subject)
 n_expected_final <- 49
 
 cat("Enrolled:                     ", n_enrolled, "\n")
-cat("Excluded (equipment failure): ", n_equipment, " (subjects 32, 39)\n", sep = "")
-cat("Excluded (withdrawal):        ",
-    if (is.na(withdrawn_subject_id)) "PENDING -- not yet applied" else paste0("1 (subject ", withdrawn_subject_id, ")"),
-    "\n", sep = "")
+cat("Excluded (confirmed by Dr. Yang):", n_excluded,
+    " (subjects 32, 45 = equipment/device failure; 48 = withdrew)\n", sep = "")
 cat("Subjects in analysis_df now:  ", n_current, "\n")
 cat("Expected final N (Yang et al., 2017): ", n_expected_final, "\n")
 
-if (is.na(withdrawn_subject_id)) {
-  cat("STATUS: Withdrawal not yet applied -- current N (", n_current,
-      ") will NOT match the expected final N (", n_expected_final,
-      ") until withdrawn_subject_id is set. Treat all current results as provisional.\n", sep = "")
-} else if (n_current == n_expected_final) {
+if (n_current == n_expected_final) {
   cat("PASS: Current N matches Yang et al. (2017)'s reported final sample of 49.\n")
 } else {
-  cat("FLAG: Current N (", n_current, ") does NOT match the expected 49 even after applying",
-      " the withdrawal exclusion -- investigate before proceeding.\n", sep = "")
+  cat("FLAG: Current N (", n_current, ") does NOT match the expected 49 -- check that raw_dir",
+      " has ace045.txt/ace048.txt removed and ace039.txt added.\n", sep = "")
 }
 
 cat("\n================ END DIAGNOSTIC REPORT ================\n")
@@ -245,8 +240,7 @@ cat("\nReview all sections above. Do not proceed to model fitting until:\n",
     "  - 5a shows no unresolved low-N cells (or you've made a documented decision on them)\n",
     "  - 5c aggressive-trimming cells have been checked for data-quality issues\n",
     "  - 5e shows no subjects missing a full cardiac-phase cell\n",
-    "  - You have confirmed the systole/diastole coding for CardiacPhase_raw (see clean_study1())\n",
-    "  - withdrawn_subject_id is set and the pipeline re-run, so the final N matches\n",
-    "    Yang et al. (2017)'s reported 49\n", sep = "")
+    "  - 5f shows PASS (N = 49, subjects 32/45/48 excluded, 39 included)\n",
+    "(CardiacTim coding confirmed by Dr. Yang: 1 = systole, 2 = diastole -- no longer pending)\n", sep = "")
 
 # analysis_df is now ready for the Model 1.1 lmer() step, once the above are resolved.
