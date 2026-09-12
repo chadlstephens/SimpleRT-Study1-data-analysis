@@ -10,7 +10,7 @@
 library(tidyverse)
 
 # ---- 0. Point this at your raw data folder ------------------------------------
-raw_dir <- "data/study1_raw"   # <-- update to your actual path
+raw_dir <- "d/Users/stephens/R/dissertation/data/study1_raw"   # <-- update to your actual path
 expected_n_files <- 49          # 52 enrolled, minus 3 excluded (32, 45, 48) per Dr. Yang's
 # confirmation. raw_dir must have ace045.txt/ace048.txt
 # REMOVED and ace039.txt ADDED (39 is NOT excluded -- it
